@@ -20,6 +20,7 @@ import {
   ReplayerEvents,
   Handler,
   Emitter,
+  MediaInteractions,
 } from '../types';
 import { mirror, polyfill } from '../utils';
 import getInjectStyleRules from './styles/inject-style';
@@ -131,7 +132,13 @@ export class Replayer {
       if (isSync) {
         castFn();
       } else {
-        actions.push({ doAction: castFn, delay: this.getDelay(event) });
+        actions.push({
+          doAction: () => {
+            castFn();
+            this.emitter.emit(ReplayerEvents.EventCast, event);
+          },
+          delay: this.getDelay(event),
+        });
       }
     }
     this.timer.addActions(actions);
@@ -401,7 +408,11 @@ export class Replayer {
           ) {
             parent.insertBefore(target, previous.nextSibling);
           } else if (next && next.parentNode) {
-            parent.insertBefore(target, next);
+            // making sure the parent contains the reference nodes
+            // before we insert target before next.
+            parent.contains(next)
+              ? parent.insertBefore(target, next)
+              : parent.insertBefore(target, null);
           } else {
             parent.appendChild(target);
           }
@@ -578,6 +589,26 @@ export class Replayer {
           ((target as Node) as HTMLInputElement).value = d.text;
         } catch (error) {
           // for safe
+        }
+        break;
+      }
+      case IncrementalSource.MediaInteraction: {
+        const target = mirror.getNode(d.id);
+        if (!target) {
+          return this.debugNodeNotFound(d, d.id);
+        }
+        const mediaEl = (target as Node) as HTMLMediaElement;
+        if (d.type === MediaInteractions.Pause) {
+          mediaEl.pause();
+        }
+        if (d.type === MediaInteractions.Play) {
+          if (mediaEl.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            mediaEl.play();
+          } else {
+            mediaEl.addEventListener('canplay', () => {
+              mediaEl.play();
+            });
+          }
         }
         break;
       }
