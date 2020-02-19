@@ -120,9 +120,6 @@ var rrwebRecord = (function () {
     var RELATIVE_PATH = /^(?!www\.|(?:http|ftp)s?:\/\/|[A-Za-z]:\\|\/\/).*/;
     var DATA_URI = /^(data:)([\w\/\+\-]+);(charset=[\w-]+|base64).*,(.*)/i;
     function absoluteToStylesheet(cssText, href) {
-        if (cssText === null || cssText === 'underfined' || !cssText) {
-            return '';
-        }
         return cssText.replace(URL_IN_CSS_REF, function (origin, path1, path2, path3) {
             var filePath = path1 || path2 || path3;
             if (!filePath) {
@@ -189,16 +186,13 @@ var rrwebRecord = (function () {
         return el.tagName === 'svg' || el instanceof SVGElement;
     }
     function transformAttribute(doc, name, value) {
-        if (name === 'src' || name === 'href') {
+        if (name === 'src' || (name === 'href' && value)) {
             return absoluteToDoc(doc, value);
         }
-        else if (name === 'srcset') {
+        else if (name === 'srcset' && value) {
             return getAbsoluteSrcsetString(doc, value);
         }
-        else if (name === 'style' &&
-            value &&
-            value !== null &&
-            value !== 'undefined') {
+        else if (name === 'style' && value) {
             return absoluteToStylesheet(value, location.href);
         }
         else {
@@ -210,14 +204,14 @@ var rrwebRecord = (function () {
             case n.DOCUMENT_NODE:
                 return {
                     type: NodeType.Document,
-                    childNodes: [],
+                    childNodes: []
                 };
             case n.DOCUMENT_TYPE_NODE:
                 return {
                     type: NodeType.DocumentType,
                     name: n.name,
                     publicId: n.publicId,
-                    systemId: n.systemId,
+                    systemId: n.systemId
                 };
             case n.ELEMENT_NODE:
                 var needBlock_1 = false;
@@ -242,7 +236,7 @@ var rrwebRecord = (function () {
                         return s.href === n.href;
                     });
                     var cssText = getCssRulesString(stylesheet);
-                    if (cssText !== null && cssText !== 'underfined' && cssText) {
+                    if (cssText) {
                         delete attributes_1.rel;
                         delete attributes_1.href;
                         attributes_1._cssText = absoluteToStylesheet(cssText, stylesheet.href);
@@ -254,7 +248,7 @@ var rrwebRecord = (function () {
                         n.textContent ||
                         '').trim().length) {
                     var cssText = getCssRulesString(n.sheet);
-                    if (cssText !== null && cssText !== 'underfined' && cssText) {
+                    if (cssText) {
                         attributes_1._cssText = absoluteToStylesheet(cssText, location.href);
                     }
                 }
@@ -280,6 +274,11 @@ var rrwebRecord = (function () {
                 if (tagName === 'canvas') {
                     attributes_1.rr_dataURL = n.toDataURL();
                 }
+                if (tagName === 'audio' || tagName === 'video') {
+                    attributes_1.rr_mediaState = n.paused
+                        ? 'paused'
+                        : 'played';
+                }
                 if (needBlock_1) {
                     var _c = n.getBoundingClientRect(), width = _c.width, height = _c.height;
                     attributes_1.rr_width = width + "px";
@@ -291,16 +290,13 @@ var rrwebRecord = (function () {
                     attributes: attributes_1,
                     childNodes: [],
                     isSVG: isSVGElement(n) || undefined,
-                    needBlock: needBlock_1,
+                    needBlock: needBlock_1
                 };
             case n.TEXT_NODE:
                 var parentTagName = n.parentNode && n.parentNode.tagName;
                 var textContent = n.textContent;
                 var isStyle = parentTagName === 'STYLE' ? true : undefined;
-                if (isStyle &&
-                    textContent !== null &&
-                    textContent !== 'underfined' &&
-                    textContent) {
+                if (isStyle && textContent) {
                     textContent = absoluteToStylesheet(textContent, location.href);
                 }
                 if (parentTagName === 'SCRIPT') {
@@ -309,17 +305,17 @@ var rrwebRecord = (function () {
                 return {
                     type: NodeType.Text,
                     textContent: textContent || '',
-                    isStyle: isStyle,
+                    isStyle: isStyle
                 };
             case n.CDATA_SECTION_NODE:
                 return {
                     type: NodeType.CDATA,
-                    textContent: '',
+                    textContent: ''
                 };
             case n.COMMENT_NODE:
                 return {
                     type: NodeType.Comment,
-                    textContent: n.textContent || '',
+                    textContent: n.textContent || ''
                 };
             default:
                 return false;

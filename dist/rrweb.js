@@ -120,9 +120,6 @@ var rrweb = (function (exports) {
     var RELATIVE_PATH = /^(?!www\.|(?:http|ftp)s?:\/\/|[A-Za-z]:\\|\/\/).*/;
     var DATA_URI = /^(data:)([\w\/\+\-]+);(charset=[\w-]+|base64).*,(.*)/i;
     function absoluteToStylesheet(cssText, href) {
-        if (cssText === null || cssText === 'underfined' || !cssText) {
-            return '';
-        }
         return cssText.replace(URL_IN_CSS_REF, function (origin, path1, path2, path3) {
             var filePath = path1 || path2 || path3;
             if (!filePath) {
@@ -189,16 +186,13 @@ var rrweb = (function (exports) {
         return el.tagName === 'svg' || el instanceof SVGElement;
     }
     function transformAttribute(doc, name, value) {
-        if (name === 'src' || name === 'href') {
+        if (name === 'src' || (name === 'href' && value)) {
             return absoluteToDoc(doc, value);
         }
-        else if (name === 'srcset') {
+        else if (name === 'srcset' && value) {
             return getAbsoluteSrcsetString(doc, value);
         }
-        else if (name === 'style' &&
-            value &&
-            value !== null &&
-            value !== 'undefined') {
+        else if (name === 'style' && value) {
             return absoluteToStylesheet(value, location.href);
         }
         else {
@@ -210,14 +204,14 @@ var rrweb = (function (exports) {
             case n.DOCUMENT_NODE:
                 return {
                     type: NodeType.Document,
-                    childNodes: [],
+                    childNodes: []
                 };
             case n.DOCUMENT_TYPE_NODE:
                 return {
                     type: NodeType.DocumentType,
                     name: n.name,
                     publicId: n.publicId,
-                    systemId: n.systemId,
+                    systemId: n.systemId
                 };
             case n.ELEMENT_NODE:
                 var needBlock_1 = false;
@@ -242,7 +236,7 @@ var rrweb = (function (exports) {
                         return s.href === n.href;
                     });
                     var cssText = getCssRulesString(stylesheet);
-                    if (cssText !== null && cssText !== 'underfined' && cssText) {
+                    if (cssText) {
                         delete attributes_1.rel;
                         delete attributes_1.href;
                         attributes_1._cssText = absoluteToStylesheet(cssText, stylesheet.href);
@@ -254,7 +248,7 @@ var rrweb = (function (exports) {
                         n.textContent ||
                         '').trim().length) {
                     var cssText = getCssRulesString(n.sheet);
-                    if (cssText !== null && cssText !== 'underfined' && cssText) {
+                    if (cssText) {
                         attributes_1._cssText = absoluteToStylesheet(cssText, location.href);
                     }
                 }
@@ -280,6 +274,11 @@ var rrweb = (function (exports) {
                 if (tagName === 'canvas') {
                     attributes_1.rr_dataURL = n.toDataURL();
                 }
+                if (tagName === 'audio' || tagName === 'video') {
+                    attributes_1.rr_mediaState = n.paused
+                        ? 'paused'
+                        : 'played';
+                }
                 if (needBlock_1) {
                     var _c = n.getBoundingClientRect(), width = _c.width, height = _c.height;
                     attributes_1.rr_width = width + "px";
@@ -291,16 +290,13 @@ var rrweb = (function (exports) {
                     attributes: attributes_1,
                     childNodes: [],
                     isSVG: isSVGElement(n) || undefined,
-                    needBlock: needBlock_1,
+                    needBlock: needBlock_1
                 };
             case n.TEXT_NODE:
                 var parentTagName = n.parentNode && n.parentNode.tagName;
                 var textContent = n.textContent;
                 var isStyle = parentTagName === 'STYLE' ? true : undefined;
-                if (isStyle &&
-                    textContent !== null &&
-                    textContent !== 'underfined' &&
-                    textContent) {
+                if (isStyle && textContent) {
                     textContent = absoluteToStylesheet(textContent, location.href);
                 }
                 if (parentTagName === 'SCRIPT') {
@@ -309,17 +305,17 @@ var rrweb = (function (exports) {
                 return {
                     type: NodeType.Text,
                     textContent: textContent || '',
-                    isStyle: isStyle,
+                    isStyle: isStyle
                 };
             case n.CDATA_SECTION_NODE:
                 return {
                     type: NodeType.CDATA,
-                    textContent: '',
+                    textContent: ''
                 };
             case n.COMMENT_NODE:
                 return {
                     type: NodeType.Comment,
-                    textContent: n.textContent || '',
+                    textContent: n.textContent || ''
                 };
             default:
                 return false;
@@ -425,8 +421,8 @@ var rrweb = (function (exports) {
                 stylesheet: {
                     source: options.source,
                     rules: rulesList,
-                    parsingErrors: errorsList,
-                },
+                    parsingErrors: errorsList
+                }
             };
         }
         function open() {
@@ -493,7 +489,7 @@ var rrweb = (function (exports) {
             column += 2;
             return pos({
                 type: 'comment',
-                comment: str,
+                comment: str
             });
         }
         function selector() {
@@ -525,7 +521,7 @@ var rrweb = (function (exports) {
             var ret = pos({
                 type: 'declaration',
                 property: prop.replace(commentre, ''),
-                value: val ? trim(val[0]).replace(commentre, '') : '',
+                value: val ? trim(val[0]).replace(commentre, '') : ''
             });
             match(/^[;\s]*/);
             return ret;
@@ -563,7 +559,7 @@ var rrweb = (function (exports) {
             return pos({
                 type: 'keyframe',
                 values: vals,
-                declarations: declarations(),
+                declarations: declarations()
             });
         }
         function atkeyframes() {
@@ -594,7 +590,7 @@ var rrweb = (function (exports) {
                 type: 'keyframes',
                 name: name,
                 vendor: vendor,
-                keyframes: frames,
+                keyframes: frames
             });
         }
         function atsupports() {
@@ -614,7 +610,7 @@ var rrweb = (function (exports) {
             return pos({
                 type: 'supports',
                 supports: supports,
-                rules: style,
+                rules: style
             });
         }
         function athost() {
@@ -632,7 +628,7 @@ var rrweb = (function (exports) {
             }
             return pos({
                 type: 'host',
-                rules: style,
+                rules: style
             });
         }
         function atmedia() {
@@ -652,7 +648,7 @@ var rrweb = (function (exports) {
             return pos({
                 type: 'media',
                 media: media,
-                rules: style,
+                rules: style
             });
         }
         function atcustommedia() {
@@ -664,7 +660,7 @@ var rrweb = (function (exports) {
             return pos({
                 type: 'custom-media',
                 name: trim(m[1]),
-                media: trim(m[2]),
+                media: trim(m[2])
             });
         }
         function atpage() {
@@ -689,7 +685,7 @@ var rrweb = (function (exports) {
             return pos({
                 type: 'page',
                 selectors: sel,
-                declarations: decls,
+                declarations: decls
             });
         }
         function atdocument() {
@@ -711,7 +707,7 @@ var rrweb = (function (exports) {
                 type: 'document',
                 document: doc,
                 vendor: vendor,
-                rules: style,
+                rules: style
             });
         }
         function atfontface() {
@@ -734,7 +730,7 @@ var rrweb = (function (exports) {
             }
             return pos({
                 type: 'font-face',
-                declarations: decls,
+                declarations: decls
             });
         }
         var atimport = _compileAtrule('import');
@@ -779,7 +775,7 @@ var rrweb = (function (exports) {
             return pos({
                 type: 'rule',
                 selectors: sel,
-                declarations: declarations(),
+                declarations: declarations()
             });
         }
         return addParent(stylesheet());
@@ -807,7 +803,7 @@ var rrweb = (function (exports) {
                 configurable: true,
                 writable: true,
                 enumerable: false,
-                value: parent || null,
+                value: parent || null
             });
         }
         return obj;
@@ -850,7 +846,7 @@ var rrweb = (function (exports) {
         foreignobject: 'foreignObject',
         glyphref: 'glyphRef',
         lineargradient: 'linearGradient',
-        radialgradient: 'radialGradient',
+        radialgradient: 'radialGradient'
     };
     function getTagName(n) {
         var tagName = tagMap[n.tagName] ? tagMap[n.tagName] : n.tagName;
@@ -945,6 +941,16 @@ var rrweb = (function (exports) {
                         }
                         if (name === 'rr_height') {
                             node_1.style.height = value;
+                        }
+                        if (name === 'rr_mediaState') {
+                            switch (value) {
+                                case 'played':
+                                    node_1.play();
+                                case 'paused':
+                                    node_1.pause();
+                                    break;
+                                default:
+                            }
                         }
                     }
                 };
@@ -2760,7 +2766,9 @@ var rrweb = (function (exports) {
                             parent.insertBefore(target, previous.nextSibling);
                         }
                         else if (next && next.parentNode) {
-                            parent.insertBefore(target, next);
+                            parent.contains(next)
+                                ? parent.insertBefore(target, next)
+                                : parent.insertBefore(target, null);
                         }
                         else {
                             parent.appendChild(target);
