@@ -121,7 +121,7 @@ var rrwebRecord = (function () {
     var RELATIVE_PATH = /^(?!www\.|(?:http|ftp)s?:\/\/|[A-Za-z]:\\|\/\/).*/;
     var DATA_URI = /^(data:)([\w\/\+\-]+);(charset=[\w-]+|base64).*,(.*)/i;
     function absoluteToStylesheet(cssText, href) {
-        return cssText.replace(URL_IN_CSS_REF, function (origin, path1, path2, path3) {
+        return (cssText || '').replace(URL_IN_CSS_REF, function (origin, path1, path2, path3) {
             var filePath = path1 || path2 || path3;
             if (!filePath) {
                 return origin;
@@ -205,14 +205,14 @@ var rrwebRecord = (function () {
             case n.DOCUMENT_NODE:
                 return {
                     type: NodeType.Document,
-                    childNodes: []
+                    childNodes: [],
                 };
             case n.DOCUMENT_TYPE_NODE:
                 return {
                     type: NodeType.DocumentType,
                     name: n.name,
                     publicId: n.publicId,
-                    systemId: n.systemId
+                    systemId: n.systemId,
                 };
             case n.ELEMENT_NODE:
                 var needBlock_1 = false;
@@ -284,6 +284,7 @@ var rrwebRecord = (function () {
                     var _c = n.getBoundingClientRect(), width = _c.width, height = _c.height;
                     attributes_1.rr_width = width + "px";
                     attributes_1.rr_height = height + "px";
+                    attributes_1.rr_background = 'grey';
                 }
                 return {
                     type: NodeType.Element,
@@ -291,7 +292,7 @@ var rrwebRecord = (function () {
                     attributes: attributes_1,
                     childNodes: [],
                     isSVG: isSVGElement(n) || undefined,
-                    needBlock: needBlock_1
+                    needBlock: needBlock_1,
                 };
             case n.TEXT_NODE:
                 var parentTagName = n.parentNode && n.parentNode.tagName;
@@ -306,17 +307,17 @@ var rrwebRecord = (function () {
                 return {
                     type: NodeType.Text,
                     textContent: textContent || '',
-                    isStyle: isStyle
+                    isStyle: isStyle,
                 };
             case n.CDATA_SECTION_NODE:
                 return {
                     type: NodeType.CDATA,
-                    textContent: ''
+                    textContent: '',
                 };
             case n.COMMENT_NODE:
                 return {
                     type: NodeType.Comment,
-                    textContent: n.textContent || ''
+                    textContent: n.textContent || '',
                 };
             default:
                 return false;
