@@ -1151,6 +1151,7 @@ var rrweb = (function (exports) {
         IncrementalSource[IncrementalSource["Input"] = 5] = "Input";
         IncrementalSource[IncrementalSource["TouchMove"] = 6] = "TouchMove";
         IncrementalSource[IncrementalSource["MediaInteraction"] = 7] = "MediaInteraction";
+        IncrementalSource[IncrementalSource["StyleSheetRule"] = 8] = "StyleSheetRule";
     })(exports.IncrementalSource || (exports.IncrementalSource = {}));
     (function (MouseInteractions) {
         MouseInteractions[MouseInteractions["MouseUp"] = 0] = "MouseUp";
@@ -1588,6 +1589,28 @@ var rrweb = (function (exports) {
             handlers.forEach(function (h) { return h(); });
         };
     }
+    function initStyleSheetObserver(cb) {
+        var insertRule = CSSStyleSheet.prototype.insertRule;
+        CSSStyleSheet.prototype.insertRule = function (rule, index) {
+            cb({
+                id: mirror.getId(this.ownerNode),
+                adds: [{ rule: rule, index: index }],
+            });
+            return insertRule.apply(this, arguments);
+        };
+        var deleteRule = CSSStyleSheet.prototype.deleteRule;
+        CSSStyleSheet.prototype.deleteRule = function (index) {
+            cb({
+                id: mirror.getId(this.ownerNode),
+                removes: [{ index: index }],
+            });
+            return deleteRule.apply(this, arguments);
+        };
+        return function () {
+            CSSStyleSheet.prototype.insertRule = insertRule;
+            CSSStyleSheet.prototype.deleteRule = deleteRule;
+        };
+    }
     function initMediaInteractionObserver(mediaInteractionCb, blockClass) {
         var handler = function (type) { return function (event) {
             var target = event.target;
@@ -1605,7 +1628,7 @@ var rrweb = (function (exports) {
         };
     }
     function mergeHooks(o, hooks) {
-        var mutationCb = o.mutationCb, mousemoveCb = o.mousemoveCb, mouseInteractionCb = o.mouseInteractionCb, scrollCb = o.scrollCb, viewportResizeCb = o.viewportResizeCb, inputCb = o.inputCb, mediaInteractionCb = o.mediaInteractionCb;
+        var mutationCb = o.mutationCb, mousemoveCb = o.mousemoveCb, mouseInteractionCb = o.mouseInteractionCb, scrollCb = o.scrollCb, viewportResizeCb = o.viewportResizeCb, inputCb = o.inputCb, mediaInteractionCb = o.mediaInteractionCb, styleSheetRuleCb = o.styleSheetRuleCb;
         o.mutationCb = function () {
             var p = [];
             for (var _i = 0; _i < arguments.length; _i++) {
@@ -1676,6 +1699,16 @@ var rrweb = (function (exports) {
             }
             mediaInteractionCb.apply(void 0, __spread(p));
         };
+        o.styleSheetRuleCb = function () {
+            var p = [];
+            for (var _i = 0; _i < arguments.length; _i++) {
+                p[_i] = arguments[_i];
+            }
+            if (hooks.styleSheetRule) {
+                hooks.styleSheetRule.apply(hooks, __spread(p));
+            }
+            styleSheetRuleCb.apply(void 0, __spread(p));
+        };
     }
     function initObservers(o, hooks) {
         if (hooks === void 0) { hooks = {}; }
@@ -1687,6 +1720,7 @@ var rrweb = (function (exports) {
         var viewportResizeHandler = initViewportResizeObserver(o.viewportResizeCb);
         var inputHandler = initInputObserver(o.inputCb, o.blockClass, o.ignoreClass, o.maskAllInputs);
         var mediaInteractionHandler = initMediaInteractionObserver(o.mediaInteractionCb, o.blockClass);
+        var styleSheetObserver = initStyleSheetObserver(o.styleSheetRuleCb);
         return function () {
             mutationObserver.disconnect();
             mousemoveHandler();
@@ -1695,6 +1729,7 @@ var rrweb = (function (exports) {
             viewportResizeHandler();
             inputHandler();
             mediaInteractionHandler();
+            styleSheetObserver();
         };
     }
 
@@ -1807,6 +1842,12 @@ var rrweb = (function (exports) {
                         return wrappedEmit(wrapEvent({
                             type: exports.EventType.IncrementalSnapshot,
                             data: __assign({ source: exports.IncrementalSource.MediaInteraction }, p),
+                        }));
+                    },
+                    styleSheetRuleCb: function (r) {
+                        return wrappedEmit(wrapEvent({
+                            type: exports.EventType.IncrementalSnapshot,
+                            data: __assign({ source: exports.IncrementalSource.StyleSheetRule }, r),
                         }));
                     },
                     blockClass: blockClass,
