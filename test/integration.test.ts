@@ -3,15 +3,20 @@ import * as path from 'path';
 import * as puppeteer from 'puppeteer';
 import { assertSnapshot, launchPuppeteer } from './utils';
 import { Suite } from 'mocha';
-import { recordOptions } from '../src/types';
+import { recordOptions, eventWithTime } from '../src/types';
 
 interface ISuite extends Suite {
   code: string;
   browser: puppeteer.Browser;
 }
 
-describe('record integration tests', function(this: ISuite) {
-  const getHtml = (fileName: string, options: recordOptions = {}): string => {
+describe('record integration tests', function (this: ISuite) {
+  this.timeout(10_000);
+
+  const getHtml = (
+    fileName: string,
+    options: recordOptions<eventWithTime> = {},
+  ): string => {
     const filePath = path.resolve(__dirname, `./html/${fileName}`);
     const html = fs.readFileSync(filePath, 'utf8');
     return html.replace(
@@ -129,7 +134,7 @@ describe('record integration tests', function(this: ISuite) {
 
     const snapshots = await page.evaluate('window.snapshots');
     assertSnapshot(snapshots, __filename, 'select2');
-  }).timeout(10000);
+  });
 
   it('should not record input events on ignored elements', async () => {
     const page: puppeteer.Page = await this.browser.newPage();
@@ -204,5 +209,14 @@ describe('record integration tests', function(this: ISuite) {
     });
     const snapshots = await page.evaluate('window.snapshots');
     assertSnapshot(snapshots, __filename, 'move-node-2');
+  });
+
+  it('should record dynamic CSS changes', async () => {
+    const page: puppeteer.Page = await this.browser.newPage();
+    await page.goto('about:blank');
+    await page.setContent(getHtml.call(this, 'react-styled-components.html'));
+    await page.click('.toggle');
+    const snapshots = await page.evaluate('window.snapshots');
+    assertSnapshot(snapshots, __filename, 'react-styled-components');
   });
 });

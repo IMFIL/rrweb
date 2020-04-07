@@ -57,11 +57,21 @@ export class Replayer {
 
   private missingNodeRetryMap: missingNodeMap = {};
 
-  constructor(events: eventWithTime[], config?: Partial<playerConfig>) {
+  private playing: boolean = false;
+
+  constructor(
+    events: Array<eventWithTime | string>,
+    config?: Partial<playerConfig>,
+  ) {
     if (events.length < 2) {
       throw new Error('Replayer need at least 2 events.');
     }
-    this.events = events;
+    this.events = events.map((e) => {
+      if (config && config.unpackFn) {
+        return config.unpackFn(e as string);
+      }
+      return e as eventWithTime;
+    });
     this.handleResize = this.handleResize.bind(this);
 
     const defaultConfig: playerConfig = {
@@ -74,6 +84,7 @@ export class Replayer {
       blockClass: 'rr-block',
       liveMode: false,
       insertStyleRules: [],
+      triggerFocus: true,
     };
     this.config = Object.assign({}, defaultConfig, config);
 
@@ -143,11 +154,13 @@ export class Replayer {
     }
     this.timer.addActions(actions);
     this.timer.start();
+    this.playing = true;
     this.emitter.emit(ReplayerEvents.Start);
   }
 
   public pause() {
     this.timer.clear();
+    this.playing = false;
     this.emitter.emit(ReplayerEvents.Pause);
   }
 
@@ -170,10 +183,14 @@ export class Replayer {
     }
     this.timer.addActions(actions);
     this.timer.start();
+    this.playing = true;
     this.emitter.emit(ReplayerEvents.Resume);
   }
 
-  public addEvent(event: eventWithTime) {
+  public addEvent(rawEvent: eventWithTime | string) {
+    const event = this.config.unpackFn
+      ? this.config.unpackFn(rawEvent as string)
+      : (rawEvent as eventWithTime);
     const castFn = this.getCastFn(event, true);
     castFn();
   }
@@ -323,10 +340,12 @@ export class Replayer {
         .forEach((css: HTMLLinkElement) => {
           if (!css.sheet) {
             if (unloadSheets.size === 0) {
-              this.pause();
+              this.timer.clear(); // artificial pause
               this.emitter.emit(ReplayerEvents.LoadStylesheetStart);
               timer = window.setTimeout(() => {
-                this.resume(this.getCurrentTime());
+                if (this.playing) {
+                  this.resume(this.getCurrentTime());
+                }
                 // mark timer was called
                 timer = -1;
               }, this.config.loadTimeout);
@@ -335,7 +354,9 @@ export class Replayer {
             css.addEventListener('load', () => {
               unloadSheets.delete(css);
               if (unloadSheets.size === 0 && timer !== -1) {
-                this.resume(this.getCurrentTime());
+                if (this.playing) {
+                  this.resume(this.getCurrentTime());
+                }
                 this.emitter.emit(ReplayerEvents.LoadStylesheetEnd);
                 if (timer) {
                   window.clearTimeout(timer);
@@ -354,7 +375,7 @@ export class Replayer {
     const { data: d } = e;
     switch (d.source) {
       case IncrementalSource.Mutation: {
-        d.removes.forEach(mutation => {
+        d.removes.forEach((mutation) => {
           const target = mirror.getNode(mutation.id);
           if (!target) {
             return this.warnNodeNotFound(d, mutation.id);
@@ -422,13 +443,13 @@ export class Replayer {
           }
         };
 
-        d.adds.forEach(mutation => {
+        d.adds.forEach((mutation) => {
           appendNode(mutation);
         });
 
         while (queue.length) {
-          if (queue.every(m => !Boolean(mirror.getNode(m.parentId)))) {
-            return queue.forEach(m => this.warnNodeNotFound(d, m.node.id));
+          if (queue.every((m) => !Boolean(mirror.getNode(m.parentId)))) {
+            return queue.forEach((m) => this.warnNodeNotFound(d, m.node.id));
           }
           const mutation = queue.shift()!;
           appendNode(mutation);
@@ -438,14 +459,14 @@ export class Replayer {
           Object.assign(this.missingNodeRetryMap, missingNodeMap);
         }
 
-        d.texts.forEach(mutation => {
+        d.texts.forEach((mutation) => {
           const target = mirror.getNode(mutation.id);
           if (!target) {
             return this.warnNodeNotFound(d, mutation.id);
           }
           target.textContent = mutation.value;
         });
-        d.attributes.forEach(mutation => {
+        d.attributes.forEach((mutation) => {
           const target = mirror.getNode(mutation.id);
           if (!target) {
             return this.warnNodeNotFound(d, mutation.id);
@@ -471,7 +492,7 @@ export class Replayer {
           const lastPosition = d.positions[d.positions.length - 1];
           this.moveAndHover(d, lastPosition.x, lastPosition.y, lastPosition.id);
         } else {
-          d.positions.forEach(p => {
+          d.positions.forEach((p) => {
             const action = {
               doAction: () => {
                 this.moveAndHover(d, p.x, p.y, p.id);
@@ -498,6 +519,7 @@ export class Replayer {
           type: d.type,
           target,
         });
+        const { triggerFocus } = this.config;
         switch (d.type) {
           case MouseInteractions.Blur:
             if (((target as Node) as HTMLElement).blur) {
@@ -505,7 +527,7 @@ export class Replayer {
             }
             break;
           case MouseInteractions.Focus:
-            if (((target as Node) as HTMLElement).focus) {
+            if (triggerFocus && ((target as Node) as HTMLElement).focus) {
               ((target as Node) as HTMLElement).focus({
                 preventScroll: true,
               });
@@ -612,6 +634,39 @@ export class Replayer {
         }
         break;
       }
+      case IncrementalSource.StyleSheetRule: {
+        const target = mirror.getNode(d.id);
+        if (!target) {
+          return this.debugNodeNotFound(d, d.id);
+        }
+
+        const styleEl = (target as Node) as HTMLStyleElement;
+        const styleSheet = <CSSStyleSheet>styleEl.sheet;
+
+        if (d.adds) {
+          d.adds.forEach(({ rule, index }) => {
+            const _index =
+              index === undefined
+                ? undefined
+                : Math.min(index, styleSheet.rules.length);
+            try {
+              styleSheet.insertRule(rule, _index);
+            } catch (e) {
+              /**
+               * sometimes we may capture rules with browser prefix
+               * insert rule with prefixs in other browsers may cause Error
+               */
+            }
+          });
+        }
+
+        if (d.removes) {
+          d.removes.forEach(({ index }) => {
+            styleSheet.deleteRule(index);
+          });
+        }
+        break;
+      }
       default:
     }
   }
@@ -658,12 +713,14 @@ export class Replayer {
   private hoverElements(el: Element) {
     this.iframe
       .contentDocument!.querySelectorAll('.\\:hover')
-      .forEach(hoveredEl => {
+      .forEach((hoveredEl) => {
         hoveredEl.classList.remove(':hover');
       });
     let currentEl: Element | null = el;
     while (currentEl) {
-      currentEl.classList.add(':hover');
+      if (currentEl.classList) {
+        currentEl.classList.add(':hover');
+      }
       currentEl = currentEl.parentElement;
     }
   }

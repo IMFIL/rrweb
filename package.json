@@ -1,6 +1,6 @@
 {
   "name": "rrweb",
-  "version": "0.7.27",
+  "version": "0.7.31",
   "description": "record and replay the web",
   "scripts": {
     "test": "npm run bundle:browser && cross-env TS_NODE_CACHE=false TS_NODE_FILES=true mocha -r ts-node/register test/**/*.test.ts",
@@ -18,8 +18,9 @@
     "rrweb"
   ],
   "main": "lib/rrweb.js",
-  "module": "es/rrweb.js",
+  "module": "es/rrweb/src/index.js",
   "unpkg": "dist/rrweb.js",
+  "sideEffects": false,
   "typings": "typings/index.d.ts",
   "files": [
     "dist",
@@ -45,7 +46,7 @@
     "jest-snapshot": "^23.6.0",
     "mocha": "^5.2.0",
     "puppeteer": "^1.11.0",
-    "rollup": "^0.66.6",
+    "rollup": "^2.3.3",
     "rollup-plugin-commonjs": "^9.2.0",
     "rollup-plugin-node-resolve": "^3.4.0",
     "rollup-plugin-postcss": "^1.6.2",
@@ -60,6 +61,7 @@
     "@types/smoothscroll-polyfill": "^0.3.0",
     "mitt": "^1.1.3",
     "rrweb-snapshot": "github:imfil/rrweb-snapshot#NoibuRRWeb-Snapshot",
+    "pako": "^1.0.11",
     "smoothscroll-polyfill": "^0.4.3"
   }
 }
