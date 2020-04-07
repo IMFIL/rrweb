@@ -73,7 +73,7 @@ var rrwebRecord = (function () {
     })(NodeType || (NodeType = {}));
 
     var _id = 1;
-    var symbolAndNumberRegex = RegExp('[^a-z]');
+    var symbolAndNumberRegex = RegExp('[^a-z1-6]');
     function genId() {
         return _id++;
     }
@@ -176,7 +176,7 @@ var rrwebRecord = (function () {
         return resultingSrcsetString;
     }
     function absoluteToDoc(doc, attributeValue) {
-        if (attributeValue.trim() === '') {
+        if (!attributeValue || attributeValue.trim() === '') {
             return attributeValue;
         }
         var a = doc.createElement('a');
@@ -673,8 +673,6 @@ var rrwebRecord = (function () {
                         });
                         break;
                     }
-                    default:
-                        break;
                 }
             });
             var addQueue = [];
@@ -963,18 +961,24 @@ var rrwebRecord = (function () {
     function initStyleSheetObserver(cb) {
         var insertRule = CSSStyleSheet.prototype.insertRule;
         CSSStyleSheet.prototype.insertRule = function (rule, index) {
-            cb({
-                id: mirror.getId(this.ownerNode),
-                adds: [{ rule: rule, index: index }],
-            });
+            var id = mirror.getId(this.ownerNode);
+            if (id !== -1) {
+                cb({
+                    id: id,
+                    adds: [{ rule: rule, index: index }],
+                });
+            }
             return insertRule.apply(this, arguments);
         };
         var deleteRule = CSSStyleSheet.prototype.deleteRule;
         CSSStyleSheet.prototype.deleteRule = function (index) {
-            cb({
-                id: mirror.getId(this.ownerNode),
-                removes: [{ index: index }],
-            });
+            var id = mirror.getId(this.ownerNode);
+            if (id !== -1) {
+                cb({
+                    id: id,
+                    removes: [{ index: index }],
+                });
+            }
             return deleteRule.apply(this, arguments);
         };
         return function () {
@@ -1110,7 +1114,7 @@ var rrwebRecord = (function () {
     var wrappedEmit;
     function record(options) {
         if (options === void 0) { options = {}; }
-        var emit = options.emit, checkoutEveryNms = options.checkoutEveryNms, checkoutEveryNth = options.checkoutEveryNth, _a = options.blockClass, blockClass = _a === void 0 ? 'rr-block' : _a, _b = options.ignoreClass, ignoreClass = _b === void 0 ? 'rr-ignore' : _b, _c = options.inlineStylesheet, inlineStylesheet = _c === void 0 ? true : _c, _d = options.maskAllInputs, maskAllInputs = _d === void 0 ? false : _d, hooks = options.hooks, _e = options.mousemoveWait, mousemoveWait = _e === void 0 ? 50 : _e;
+        var emit = options.emit, checkoutEveryNms = options.checkoutEveryNms, checkoutEveryNth = options.checkoutEveryNth, _a = options.blockClass, blockClass = _a === void 0 ? 'rr-block' : _a, _b = options.ignoreClass, ignoreClass = _b === void 0 ? 'rr-ignore' : _b, _c = options.inlineStylesheet, inlineStylesheet = _c === void 0 ? true : _c, _d = options.maskAllInputs, maskAllInputs = _d === void 0 ? false : _d, hooks = options.hooks, _e = options.mousemoveWait, mousemoveWait = _e === void 0 ? 50 : _e, packFn = options.packFn;
         if (!emit) {
             throw new Error('emit function is required');
         }
@@ -1118,7 +1122,7 @@ var rrwebRecord = (function () {
         var lastFullSnapshotEvent;
         var incrementalSnapshotCount = 0;
         wrappedEmit = function (e, isCheckout) {
-            emit(e, isCheckout);
+            emit((packFn ? packFn(e) : e), isCheckout);
             if (e.type === EventType.FullSnapshot) {
                 lastFullSnapshotEvent = e;
                 incrementalSnapshotCount = 0;
